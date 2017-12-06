@@ -1,0 +1,33 @@
+dmvpn-ca hub create [<id>]
+dmvpn-ca hub set name <value> <id>
+dmvpn-ca hub unset name <id>
+dmvpn-ca hub show
+dmvpn-ca hub retire <id>
+
+dmvpn-ca site add <abbr>
+dmvpn-ca site set {asn|name} <value> <abbr>
+dmvpn-ca site unset name <abbr>
+dmvpn-ca site show [code <abbr>]
+dmvpn-ca site retire <abbr>
+
+dmvpn-ca subnet add <addr> site <abbr>
+dmvpn-ca subnet show [site <abbr>]
+dmvpn-ca subnet del <addr> [site <abbr>]
+
+dmvpn-ca vpnc create site <abbr> [id <num>]
+dmvpn-ca vpnc set name <value> site <abbr> id <num>
+dmvpn-ca vpnc unset name site <abbr> id <num>
+dmvpn-ca vpnc show [site <abbr>]
+dmvpn-ca vpnc retire <id> site <abbr>
+
+dmvpn-ca gre-addr add <addr> {hub <id>|site <abbr> [vpnc <id>]}
+dmvpn-ca gre-addr del <addr>
+
+
+dmvpn-ca root-cert {generate|show}
+
+dmvpn-ca cert generate [hubs|hub <id>|site <abbr> [vpnc <id>]]
+dmvpn-ca cert {list|show|revoke} [serial <num>|hubs|hub <id>|site <abbr> [vpnc <id>]]
+dmvpn-ca cert export serial <num>
+
+dmvpn-ca crl {show|export}

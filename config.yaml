@@ -1,0 +1,17 @@
+cert:
+  lifetime: 600
+
+ca:
+  dn: 'DC=com,DC=example'
+  lifetime: 3600
+  key:
+    curve: secp521r1
+
+hub:
+  subnets:
+  - '10.0.0.0/8'
+  - '172.16.0.0/16'
+  - 'fd06:f00d:cafe::/64'
+
+crl:
+  dist-point: 'http://example.com/dmvpn-ca.crl'
