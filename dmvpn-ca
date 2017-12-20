@@ -1131,6 +1131,17 @@ output = scan_choice(
 									)
 								)
 
+								local hosts = config.hub.hosts
+								if hosts then
+									cert:addExtension(
+										x509ext.new(
+											dmvpn.OID_HUB_HOSTS,
+											'DER',
+											asn1.sequence_of(asn1.ia5string).encode(hosts)
+										)
+									)
+								end
+
 								local net_config = {}
 								local pr_config = {}
 								for subnet in get_subnets() do
