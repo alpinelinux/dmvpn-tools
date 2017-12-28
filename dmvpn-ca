@@ -42,7 +42,10 @@ x509ch = require('openssl.x509.chain')
 x509crl = require('openssl.x509.crl')
 x509ext = require('openssl.x509.extension')
 x509n = require('openssl.x509.name')
+
+stat = require('posix.sys.stat')
 unistd = require('posix.unistd')
+
 stringy = require('stringy')
 
 dev = io.open('/dev/urandom')
@@ -94,6 +97,8 @@ end
 
 
 now = os.time()
+
+stat.umask(bit32.bor(stat.S_IRWXG, stat.S_IRWXO))
 
 
 function connection()
