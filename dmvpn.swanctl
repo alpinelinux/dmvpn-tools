@@ -1,0 +1,26 @@
+# Copyright (c) 2017-2018 Kaarle Ritvanen
+# See LICENSE file for license details
+
+connections {
+	dmvpn {
+		mobike = no
+		dpd_delay = 15s
+		unique = replace
+		reauth_time = 13h
+		local {
+			certs = dmvpn.pem
+		}
+		remote {
+			cacerts = dmvpn.pem
+		}
+		children {
+			dmvpn {
+				local_ts = dynamic[gre]
+				remote_ts = dynamic[gre]
+				inactivity = 90m
+				rekey_time = 100m
+				mode = transport
+			}
+		}
+	}
+}

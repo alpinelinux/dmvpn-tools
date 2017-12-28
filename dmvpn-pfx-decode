@@ -1,0 +1,94 @@
+#!/usr/bin/lua5.2
+
+--[[
+Copyright (c) 2017-2018 Kaarle Ritvanen
+See LICENSE file for license details
+]]--
+
+dmvpn = require('dmvpn')
+pkcs12 = require('openssl.pkcs12')
+
+name = arg[1]
+file = io.open(name)
+data = file:read('*a')
+file:close()
+
+name = name:match('/([^/]+)$') or name
+password = name:match('^%w*_%d+%.(%w+)%.pfx$')
+if password then
+	success, key, cert, chain = pcall(pkcs12.parse, data, password)
+end
+if not success then
+	io.stderr:write('Password: ')
+	os.execute('stty -echo')
+	password = io.read()
+	os.execute('stty echo')
+	io.stderr:write('\n')
+	key, cert, chain = pkcs12.parse(data, password)
+end
+
+function write_pem_file(dir, data)
+	local file = io.open('/etc/swanctl/'..dir..'/dmvpn.pem', 'w')
+	file:write(data)
+	file:close()
+end
+
+write_pem_file('private', key:toPEM('private'))
+write_pem_file('x509', tostring(cert))
+for i, ca_cert in pairs(chain) do
+	assert(i == 1)
+	write_pem_file('x509ca', tostring(ca_cert))
+end
+
+function print_var(name, value)
+	print(name.."='"..value:gsub("'", "'\\''").."'")
+end
+
+for tpe, value in pairs(cert:getSubjectAlt()) do
+	if tpe == 'IP' then
+		if value:match('^[%d%.]+$') then
+			print_var('GRE_IPV4_ADDRESS', value)
+		elseif value:match('^[%x:]+$') then
+			print_var('GRE_IPV6_ADDRESS', value)
+		else assert(false) end
+	end
+end
+
+EXTENSIONS = {
+	basicConstraints=true,
+	['sbgp-ipAddrBlock']={
+		IPV4_PREFIXES=function(v) return v[1] end,
+		IPV6_PREFIXES=function(v) return v[2] end
+	},
+	['sbgp-autonomousSysNum']='AS_NUMBER',
+	[dmvpn.OID_IS_HUB]={
+		VPNC_TYPE=function(v) return v and 'hub' or 'spoke' end
+	},
+	[dmvpn.OID_HUB_HOSTS]='HUBS'
+}
+
+
+for i=1,cert:getExtensionCount() do
+	ext = cert:getExtension(i)
+	k = ext:getName()
+	v = EXTENSIONS[k]
+	if v then
+		if type(v) == 'string' then
+			v = {[v]=function(v) return v end}
+		end
+		if type(v) == 'table' then
+			local data = dmvpn.decode_ext(k, ext)
+			for var, func in pairs(v) do
+				local d = func(data)
+				print_var(
+					var,
+					type(d) == 'table' and
+						table.concat(d, ' ') or
+						tostring(d)
+				)
+			end
+		end
+	elseif ext:getCritical() then
+		error('Unrecognized critical extension: '..k)
+	end
+end

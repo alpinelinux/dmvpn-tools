@@ -1,0 +1,248 @@
+#!/bin/sh -e
+
+# Dynamic Multipoint VPN setup script for Alpine Linux
+# Copyright (c) 2017-2018 Kaarle Ritvanen
+# See LICENSE file for license details
+
+
+. /lib/libalpine.sh
+
+if [ -z "$1" ]; then
+	echo "Usage: $0 <pfx_file>" >&2
+	exit 1
+fi
+
+
+ATTRS=$(/usr/libexec/dmvpn-pfx-decode "$1")
+eval $ATTRS
+
+for attr in GRE_IPV4_ADDRESS HUBS VPNC_TYPE; do
+	eval "[ \"\$$attr\" ]" || die "attribute not defined: $attr"
+done
+
+
+ask "NHRP network ID" 1
+NHRP_ID=$resp
+
+NFLOG_GROUP=
+if [ $VPNC_TYPE = hub ]; then
+	ask "NFLOG group" 1
+	NFLOG_GROUP=$resp
+
+	ask "DMVPN site IPv4 prefix length" 16
+	SITE_PREFIX_LEN_IPV4=$resp
+
+	if [ "$GRE_IPV6_ADDRESS" ]; then
+		ask "DMVPN site IPv6 prefix length" 48
+		SITE_PREFIX_LEN_IPV6=$resp
+	fi
+fi
+
+
+PMTU_SYSCTL=net.ipv4.ip_forward_use_pmtu
+
+
+get_dev() {
+	sed -E "s/^$* (.+ )?dev ([^ ]+)( .+)?\$/\\2/;ta;d;:a"
+}
+
+get_local_dev() {
+	ip route list table local | get_dev local $1
+}
+
+enable_service() {
+	rc-update add $1
+	rc-service $1 start
+}
+
+enable_firewall() {
+	augtool -s <<EOF
+set /files/etc/conf.d/$1/IPFORWARD yes
+set /files/etc/conf.d/$1/SAVE_ON_STOP no
+EOF
+	enable_service $1
+}
+
+get_config_cmds() {
+	local p=$1
+	shift
+	while [ $# -gt 0 ]; do
+		[ "$1" ] && echo $p $1
+		shift
+	done
+}
+
+get_nhrp_config() {
+	(
+		IFS=$'\n'
+		get_config_cmds "$1 nhrp" \
+			"network-id $NHRP_ID" \
+			shortcut \
+			"registration no-unique" \
+			"${NFLOG_GROUP:+redirect}" \
+			$(get_config_cmds "nhs dynamic nbma" $HUBS)
+	)
+}
+
+get_peer_config() {
+	local group=$1
+	local map=RTT-$2
+	shift 2
+	get_config_cmds "neighbor $group" \
+		peer-group \
+		passive \
+		"ebgp-multihop 1" \
+		disable-connected-check \
+		"timers 10 30" \
+		"next-hop-self all" \
+		"soft-reconfiguration inbound" \
+		"route-map $map in" \
+		"$@"
+}
+
+get_spoke_config() {
+	local group=spoke-$1
+	shift
+	get_peer_config $group SET "$@" \
+		"advertisement-interval 1" \
+		"prefix-list no-hosts out"
+}
+
+get_quagga_config() {
+	cat <<EOF
+	configure terminal
+		nhrp event socket /var/run/nhrp-events.sock
+		${NFLOG_GROUP:+nhrp nflog-group $NFLOG_GROUP}
+		interface $GRE_IFACE
+			tunnel protection vici profile dmvpn
+EOF
+	get_nhrp_config ip
+	[ "$GRE_IPV6_ADDRESS" ] && get_nhrp_config ipv6
+	cat <<EOF
+		exit
+		router bgp $AS_NUMBER
+EOF
+	get_config_cmds network $IPV4_PREFIXES
+	if [ "$IPV6_PREFIXES" ]; then
+		echo address-family ipv6
+		get_config_cmds network $IPV6_PREFIXES
+		echo exit
+	fi
+	echo exit
+	if [ $VPNC_TYPE = hub ]; then
+		cat <<EOF
+		ip prefix-list no-hosts seq 5 permit 0.0.0.0/0 le 30
+		route-map RTT-SET permit 10
+			set metric rtt
+		exit
+		router bgp $AS_NUMBER
+EOF
+		get_peer_config hubs ADD \
+			"remote-as $AS_NUMBER" \
+			"timers connect 10"
+		get_spoke_config ebgp "attribute-unchanged med"
+		get_spoke_config ibgp \
+			"remote-as $AS_NUMBER" \
+			route-reflector-client
+		echo exit
+	fi
+	cat <<EOF
+	exit
+	write memory
+EOF
+}
+
+
+GRE_IFACE=$(get_local_dev $GRE_IPV4_ADDRESS)
+
+if [ -z "$GRE_IFACE" ]; then
+	ask_which interface "shall be used for GRE transport" \
+		"$(ls /sys/class/net)" \
+		$(for h in $HUBS; do
+			if expr ${h##*.} : '[a-zA-Z][a-zA-Z0-9]*$' \
+				> /dev/null; then
+
+				host $h | sed -E 's/^.+ has address //;ta;d;:a'
+			else
+				echo $h
+			fi
+		done | while read addr; do
+
+			if [ -z "$(get_local_dev $addr)" ]; then
+				ip route get $addr | get_dev $addr
+				break
+			fi
+		done)
+	TRANSPORT_IFACE=$resp
+
+	i=1
+	while [ -d /sys/class/net/gre$i ]; do
+		: $(( i++ ))
+	done
+
+	ask "GRE tunnel interface" gre$i
+	GRE_IFACE=$resp
+
+	echo "$PMTU_SYSCTL = 1" > /etc/sysctl.d/dmvpn.conf
+	sysctl -w $PMTU_SYSCTL=1
+
+	cat >> /etc/network/interfaces <<EOF
+
+auto $GRE_IFACE
+iface $GRE_IFACE inet static
+	address $GRE_IPV4_ADDRESS
+	netmask 255.255.255.255
+	tunnel-mode gre
+	tunnel-dev $TRANSPORT_IFACE
+	tunnel-ttl 64
+EOF
+
+	if [ "$GRE_IPV6_ADDRESS" ]; then
+		cat >> /etc/network/interfaces <<EOF
+iface $GRE_IFACE inet6 static
+	address $GRE_IPV6_ADDRESS
+	netmask 128
+EOF
+	fi
+
+	ifup $GRE_IFACE
+fi
+
+
+augtool -s <<EOF
+set /files/etc/conf.d/nhrpd/rc_need '"charon nhrp-events"'
+set /files/etc/strongswan.d/charon.conf/charon/x509/enforce_critical no
+EOF
+
+for serv in bgpd nhrpd zebra; do
+	file=/etc/quagga/$serv.conf
+	touch $file
+	chown quagga $file
+done
+
+enable_service nhrpd
+
+vtysh -c "$(get_quagga_config)"
+
+
+if [ "$NFLOG_GROUP" ]; then
+	apk add awall
+	cat > /etc/awall/dmvpn.json <<EOF
+{
+	"variable": {
+		"dmvpn_gre_iface": "$GRE_IFACE",
+		"dmvpn_nflog_group": $NFLOG_GROUP,
+		"dmvpn_site_mask": { "inet": $SITE_PREFIX_LEN_IPV4 }
+	}
+}
+EOF
+	[ "$SITE_PREFIX_LEN_IPV6" ] && augtool -s <<EOF
+set /files/etc/awall/dmvpn.json/dict/entry/dict/entry['dmvpn_site_mask']/dict/entry[2] inet6
+set /files/etc/awall/dmvpn.json/dict/entry/dict/entry['dmvpn_site_mask']/dict/entry[2]/number $SITE_PREFIX_LEN_IPV6
+EOF
+
+	awall enable dmvpn-hub
+	awall translate
+	enable_firewall iptables
+	[ "$SITE_PREFIX_LEN_IPV6" ] && enable_firewall ip6tables
+fi

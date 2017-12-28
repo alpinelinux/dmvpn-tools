@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+
+# init.d file for nhrp-events
+# Copyright (c) 2017-2018 Kaarle Ritvanen
+
+name=nhrp-events
+command=/usr/sbin/$name
+pidfile=/var/run/$name.pid
+command_background=1
+
+depend() {
+	need bgpd
+}
