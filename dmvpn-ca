@@ -26,7 +26,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ]]--
 
-conf_file = io.open('config.yaml')
+conf_file = io.open(os.getenv('DMVPN_CA_CONF') or '/etc/dmvpn-ca.conf')
 config = require('lyaml').load(conf_file:read('*a'))
 conf_file:close()
 
@@ -69,7 +69,7 @@ end
 set_config_defaults(
 	config,
 	{
-		['db-file']='dmvpn-ca.sqlite3',
+		['db-file']='/var/lib/misc/dmvpn-ca.sqlite3',
 		cert={
 			lifetime=365 * 24 * 60 * 60,
 			['hash-alg']='SHA256',
