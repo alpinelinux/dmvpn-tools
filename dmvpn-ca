@@ -18,6 +18,8 @@ asn1 = require('asn1')
 rfc3779 = require('asn1.rfc3779')
 rfc5280 = require('asn1.rfc5280')
 
+dmvpn = require('dmvpn')
+
 pkcs12 = require('openssl.pkcs12')
 pkey = require('openssl.pkey')
 x509 = require('openssl.x509')
@@ -1123,7 +1125,7 @@ output = scan_choice(
 
 								cert:addExtension(
 									x509ext.new(
-										'1.3.6.1.4.1.31536.1.1',
+										dmvpn.OID_IS_HUB,
 										'critical,DER',
 										asn1.boolean.encode(attrs.site == '')
 									)

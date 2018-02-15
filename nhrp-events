@@ -6,6 +6,7 @@ address against certificate subjectAltName IP, and auto-creates BGP pairings
 and filters based on S-BGP extensions.
 
 Copyright (c) 2015-2017 Timo Teräs
+Copyright (c) 2017-2018 Kaarle Ritvanen
 
 See LICENSE file for license details
 ]]--
@@ -16,7 +17,9 @@ local cq = require 'cqueues'
 local cqs = require 'cqueues.socket'
 local x509 = require 'openssl.x509'
 local x509an = require 'openssl.x509.altname'
+local asn1 = require 'asn1'
 local rfc3779 = require 'asn1.rfc3779'
+local dmvpn = require 'dmvpn'
 
 local SOCK = "/var/run/nhrp-events.sock"
 posix.unlink(SOCK)
@@ -81,8 +84,7 @@ local function parse_cert(certhex)
 	}
 	local cert = x509.new(certhex:hex2bin(), 'der')
 	out.cn = tostring(cert:getSubject())
-	-- Recognize hubs by certificate's CN to have OU=Hubs
-	out.hub = out.cn:match("/OU=Hubs/") and true or nil
+	out.hub = decode_ext(cert, dmvpn.OID_IS_HUB, asn1.boolean)
 	do_parse_cert(cert, out)
 	return out
 end
