@@ -1,10 +1,14 @@
 #!/usr/bin/lua5.2
 
--- Example NHRP events processing script which validates
--- NHRP registration GRE address against certificate subjectAltName IP
--- and auto-creates BGP pairings and filters based on sbgp extensions.
+--[[
+Example NHRP events processing script which validates NHRP registration GRE
+address against certificate subjectAltName IP, and auto-creates BGP pairings
+and filters based on S-BGP extensions.
 
--- Depends on lua5.2 lua5.2-posix lua5.2-cqueues lua5.2-ossl lua-asn1
+Copyright (c) 2015-2017 Timo Teräs
+
+See LICENSE file for license details
+]]--
 
 local posix = require 'posix'
 local struct = require 'struct'
