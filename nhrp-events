@@ -17,8 +17,6 @@ local cq = require 'cqueues'
 local cqs = require 'cqueues.socket'
 local x509 = require 'openssl.x509'
 local x509an = require 'openssl.x509.altname'
-local asn1 = require 'asn1'
-local rfc3779 = require 'asn1.rfc3779'
 local dmvpn = require 'dmvpn'
 
 local SOCK = "/var/run/nhrp-events.sock"
@@ -37,10 +35,10 @@ function string.hex2bin(str)
 	return str:gsub('..', function(cc) return string.char(tonumber(cc, 16)) end)
 end
 
-local function decode_ext(cert, name, tpe)
+local function decode_ext(cert, name)
 	local ext = cert:getExtension(name)
 	if not ext then return end
-	return tpe.decode(ext:getData())
+	return dmvpn.decode_ext(name, ext)
 end
 
 local function do_parse_cert(cert, out)
@@ -51,26 +49,8 @@ local function do_parse_cert(cert, out)
 	end
 	if #out.GRE == 0 then return end
 
-	local asn = decode_ext(cert, 'sbgp-autonomousSysNum', rfc3779.ASIdentifiers)
-	if asn and asn.asnum and asn.asnum.asIdsOrRanges then
-		for _, as in ipairs(asn.asnum.asIdsOrRanges) do
-			if as.id then
-				out.AS = tonumber(as.id)
-				break
-			end
-		end
-	end
-
-	local addrBlocks = decode_ext(cert, 'sbgp-ipAddrBlock', rfc3779.IPAddrBlocks)
-	for _, ab in ipairs(addrBlocks or {}) do
-		if ab.ipAddressChoice and ab.ipAddressChoice.addressesOrRanges then
-			for _, a in ipairs(ab.ipAddressChoice.addressesOrRanges) do
-				if a.addressPrefix then
-					table.insert(out.NET, a.addressPrefix)
-				end
-			end
-		end
-	end
+	out.AS = decode_ext(cert, 'sbgp-autonomousSysNum')
+	out.NET = decode_ext(cert, 'sbgp-ipAddrBlock')
 
 	return true
 end
@@ -84,7 +64,7 @@ local function parse_cert(certhex)
 	}
 	local cert = x509.new(certhex:hex2bin(), 'der')
 	out.cn = tostring(cert:getSubject())
-	out.hub = decode_ext(cert, dmvpn.OID_IS_HUB, asn1.boolean)
+	out.hub = decode_ext(cert, dmvpn.OID_IS_HUB)
 	do_parse_cert(cert, out)
 	return out
 end
