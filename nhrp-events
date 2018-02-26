@@ -166,13 +166,25 @@ end
 local function bgp_create_spoke_rules(msg, remote_cert, local_cert)
 	if not local_cert.hub then return end
 
+	if not config then
+		local conf_file = io.open("/etc/nhrp-events.conf")
+		config = require("lyaml").load(conf_file:read("*a"))
+		conf_file:close()
+	end
+
 	local bgpcfg = {}
 	for afi, family in ipairs{"ip", "ipv6"} do
 		for seq, net in ipairs(remote_cert.NET[afi]) do
+			local len = tonumber(net:match('/(%d+)$'))
+			local limit = remote_cert.hub and ({32, 128})[afi] or config['max-prefix-length'][family]
 			table.insert(
 				bgpcfg,
-				("%s prefix-list net-%s-in seq %d permit %s"):format(
-					family, msg.remote_addr, seq * 5, net
+				("%s prefix-list net-%s-in seq %d permit %s%s"):format(
+					family,
+					msg.remote_addr,
+					seq * 5,
+					net,
+					limit > len and (" le %d"):format(limit) or ""
 				)
 			)
 		end

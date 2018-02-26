@@ -251,5 +251,16 @@ EOF
 	awall enable dmvpn-hub
 	awall translate
 	enable_firewall iptables
-	[ "$SITE_PREFIX_LEN_IPV6" ] && enable_firewall ip6tables
+
+	cat > /etc/nhrp-events.conf <<EOF
+max-prefix-length:
+  ip: $SITE_PREFIX_LEN_IPV4
+EOF
+
+	if [ "$SITE_PREFIX_LEN_IPV6" ]; then
+		enable_firewall ip6tables
+		cat >> /etc/nhrp-events.conf <<EOF
+  ipv6: $SITE_PREFIX_LEN_IPV6
+EOF
+	fi
 fi
