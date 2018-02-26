@@ -60,7 +60,7 @@ local function parse_cert(certhex)
 		cn = "(no CN)",
 		AS = 0,
 		GRE = {},
-		NET = {},
+		NET = {{}, {}}
 	}
 	local cert = x509.new(certhex:hex2bin(), 'der')
 	out.cn = tostring(cert:getSubject())
@@ -143,9 +143,19 @@ local function bgp_reset(msg, local_cert)
 end
 
 local function bgp_nhs_up(msg, remote_cert, local_cert)
-	configure_bgp(("nhs-up %s"):format(msg.remote_addr),
+	local bgpcfg = {
 		("router bgp %s"):format(local_cert.AS),
-		("neighbor %s peer-group hubs"):format(msg.remote_addr))
+		("neighbor %s peer-group hubs"):format(msg.remote_addr)
+	}
+	if #local_cert.NET[2] > 0 then
+		table.insert(bgpcfg, "address-family ipv6")
+		table.insert(
+			bgpcfg, ("neighbor %s activate"):format(msg.remote_addr)
+		)
+	end
+	configure_bgp(
+		("nhs-up %s"):format(msg.remote_addr), table.unpack(bgpcfg)
+	)
 end
 
 local function bgp_nhs_down(msg, remote_cert, local_cert)
@@ -158,11 +168,15 @@ local function bgp_create_spoke_rules(msg, remote_cert, local_cert)
 	if not local_cert.hub then return end
 
 	local bgpcfg = {}
-	for seq, net in ipairs(remote_cert.NET) do
-		table.insert(bgpcfg,
-			("ip prefix-list net-%s-in seq %d permit %s le %d"):format(
-				msg.remote_addr, seq * 5, net,
-				remote_cert.hub and 32 or 26))
+	for afi, family in ipairs{"ip", "ipv6"} do
+		for seq, net in ipairs(remote_cert.NET[afi]) do
+			table.insert(
+				bgpcfg,
+				("%s prefix-list net-%s-in seq %d permit %s"):format(
+					family, msg.remote_addr, seq * 5, net
+				)
+			)
+		end
 	end
 	table.insert(bgpcfg, ("router bgp %s"):format(local_cert.AS))
 	if remote_cert.hub then
@@ -174,6 +188,17 @@ local function bgp_create_spoke_rules(msg, remote_cert, local_cert)
 		table.insert(bgpcfg, ("neighbor %s peer-group spoke-ebgp"):format(msg.remote_addr))
 	end
 	table.insert(bgpcfg, ("neighbor %s prefix-list net-%s-in in"):format(msg.remote_addr, msg.remote_addr))
+
+	if #remote_cert.NET[2] > 0 then
+		table.insert(bgpcfg, "address-family ipv6")
+		table.insert(
+			bgpcfg, ("neighbor %s activate"):format(msg.remote_addr)
+		)
+		table.insert(
+			bgpcfg,
+			("neighbor %s prefix-list net-%s-in in"):format(msg.remote_addr, msg.remote_addr)
+		)
+	end
 
 	local status, output = configure_bgp(("nhc-register %s"):format(msg.remote_addr), table.unpack(bgpcfg))
 	if output:find("Cannot") then
@@ -206,19 +231,21 @@ local function handle_message(msg)
 		msg.remote_addr, msg.remote_nbma, remote_cert.cn))
 
 	-- Automatic BGP binding for hub-spoke connections
-	if msg.type == "nhs" and msg.old_type ~= "nhs" then
-		if not local_cert.hub then
-			if tonumber(msg.num_nhs) == 0 and msg.vc_initiated == "yes" then
-				bgp_reset(msg, local_cert)
+	if msg.remote_addr:find("%.") then
+		if msg.type == "nhs" and msg.old_type ~= "nhs" then
+			if not local_cert.hub then
+				if tonumber(msg.num_nhs) == 0 and msg.vc_initiated == "yes" then
+					bgp_reset(msg, local_cert)
+				end
+				bgp_nhs_up(msg, remote_cert, local_cert)
+			else
+				bgp_create_spoke_rules(msg, remote_cert, local_cert)
 			end
-			bgp_nhs_up(msg, remote_cert, local_cert)
-		else
+		elseif msg.type ~= "nhs" and msg.old_type == "nhs" then
+			bgp_nhs_down(msg, remote_cert, local_cert)
+		elseif msg.type == "dynamic" and msg.old_type ~= "dynamic" then
 			bgp_create_spoke_rules(msg, remote_cert, local_cert)
 		end
-	elseif msg.type ~= "nhs" and msg.old_type == "nhs" then
-		bgp_nhs_down(msg, remote_cert, local_cert)
-	elseif msg.type == "dynamic" and msg.old_type ~= "dynamic" then
-		bgp_create_spoke_rules(msg, remote_cert, local_cert)
 	end
 
 	return "accept"

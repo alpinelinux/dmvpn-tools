@@ -21,12 +21,13 @@ local decoders={
 		end
 	end,
 	['sbgp-ipAddrBlock']=function(d)
-		local res = {}
+		local res = {{}, {}}
 		for _, ab in ipairs(rfc3779.IPAddrBlocks.decode(d)) do
-			if ab.ipAddressChoice and ab.ipAddressChoice.addressesOrRanges then
+			local afi = ab.addressFamily.afi
+			if res[afi] and ab.ipAddressChoice and ab.ipAddressChoice.addressesOrRanges then
 				for _, a in ipairs(ab.ipAddressChoice.addressesOrRanges) do
 					if a.addressPrefix then
-						table.insert(res, a.addressPrefix)
+						table.insert(res[afi], a.addressPrefix)
 					end
 				end
 			end
