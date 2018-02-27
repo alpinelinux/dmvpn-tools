@@ -132,7 +132,6 @@ local function bgp_reset(msg, local_cert)
 		("router bgp %d"):format(local_cert.AS),
 		"no neighbor hubs",
 		"neighbor hubs peer-group",
-		"neighbor hubs remote-as 65000",
 		"neighbor hubs ebgp-multihop 1",
 		"neighbor hubs disable-connected-check",
 		"neighbor hubs timers 10 30",
@@ -145,6 +144,7 @@ end
 local function bgp_nhs_up(msg, remote_cert, local_cert)
 	local bgpcfg = {
 		("router bgp %s"):format(local_cert.AS),
+		("neighbor %s remote-as %d"):format(msg.remote_addr, remote_cert.AS),
 		("neighbor %s peer-group hubs"):format(msg.remote_addr)
 	}
 	if #local_cert.NET[2] > 0 then
