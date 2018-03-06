@@ -98,7 +98,6 @@ get_peer_config() {
 	shift 2
 	get_config_cmds "neighbor $group" \
 		peer-group \
-		passive \
 		"ebgp-multihop 1" \
 		disable-connected-check \
 		"timers 10 30" \
@@ -112,6 +111,7 @@ get_spoke_config() {
 	local group=spoke-$1
 	shift
 	get_peer_config $group SET "$@" \
+		passive \
 		"advertisement-interval 1" \
 		"prefix-list no-hosts out"
 }
