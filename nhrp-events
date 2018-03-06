@@ -127,7 +127,6 @@ local function bgp_reset(msg, local_cert)
 	last_bgp_reset = now
 
 	configure_bgp("spoke reset",
-		"route-map RTT-SET permit 10", "set metric rtt", "exit",
 		"route-map RTT-ADD permit 10", "set metric +rtt", "exit",
 		("router bgp %d"):format(local_cert.AS),
 		"no neighbor hubs",
