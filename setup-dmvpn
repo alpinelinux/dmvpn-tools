@@ -84,6 +84,14 @@ get_nhrp_config() {
 	)
 }
 
+get_route_map_config() {
+	cat <<EOF
+	route-map RTT-$1 permit 10
+		set metric $2rtt
+	exit
+EOF
+}
+
 get_peer_config() {
 	local group=$1
 	local map=RTT-$2
@@ -130,11 +138,10 @@ EOF
 	fi
 	echo exit
 	if [ $VPNC_TYPE = hub ]; then
+		get_route_map_config ADD +
+		get_route_map_config SET
 		cat <<EOF
 		ip prefix-list no-hosts seq 5 permit 0.0.0.0/0 le 30
-		route-map RTT-SET permit 10
-			set metric rtt
-		exit
 		router bgp $AS_NUMBER
 EOF
 		get_peer_config hubs ADD \
