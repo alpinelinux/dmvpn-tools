@@ -19,12 +19,7 @@ if password then
 	success, key, cert, chain = pcall(pkcs12.parse, data, password)
 end
 if not success then
-	io.stderr:write('Password: ')
-	os.execute('stty -echo')
-	password = io.read()
-	os.execute('stty echo')
-	io.stderr:write('\n')
-	key, cert, chain = pkcs12.parse(data, password)
+	key, cert, chain = pkcs12.parse(data, dmvpn.get_password())
 end
 
 function write_pem_file(dir, data)

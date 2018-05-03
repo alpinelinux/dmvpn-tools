@@ -42,4 +42,13 @@ local decoders={
 
 function M.decode_ext(oid, ext) return decoders[oid](ext:getData()) end
 
+function M.get_password()
+	io.stderr:write('Password: ')
+	os.execute('stty -echo')
+	local res = io.read()
+	os.execute('stty echo')
+	io.stderr:write('\n')
+	return res
+end
+
 return M
