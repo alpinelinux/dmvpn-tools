@@ -42,12 +42,20 @@ local decoders={
 
 function M.decode_ext(oid, ext) return decoders[oid](ext:getData()) end
 
-function M.get_password()
-	io.stderr:write('Password: ')
-	os.execute('stty -echo')
-	local res = io.read()
-	os.execute('stty echo')
-	io.stderr:write('\n')
+function M.get_password(new)
+	local function get(prompt)
+		io.stderr:write(prompt..': ')
+		os.execute('stty -echo')
+		local res = io.read()
+		os.execute('stty echo')
+		io.stderr:write('\n')
+		return res
+	end
+
+	local res = get((new and 'New p' or 'P')..'assword')
+	if new and get('Confirm password') ~= res then
+		raise('Password mismatch')
+	end
 	return res
 end
 

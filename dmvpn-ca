@@ -81,6 +81,10 @@ for _, ct in ipairs{'ca', 'hub', 'spoke', 'crl'} do
 	set_config_defaults(config[ct], config.cert)
 end
 
+if config.db['encrypt-keys'] == true then
+	config.db['encrypt-keys'] = 'aes128'
+end
+
 
 now = os.time()
 
@@ -206,13 +210,22 @@ function detect_prefix_afi(s)
 end
 
 
+function get_password(new)
+	if not password then password = dmvpn.get_password(new) end
+	return password
+end
+
+function decrypt_key(key)
+	return pkey.new(key, 'PEM', 'private', get_password)
+end
+
 function load_ca()
 	if not ca_cert then
 		local row = select_one(
 			'data, privateKey', 'certificate', {serial=0}, 'n'
 		)
 		ca_cert = x509.new(row[1], 'PEM')
-		ca_key = pkey.new(row[2], 'PEM', 'private')
+		ca_key = decrypt_key(row[2])
 	end
 	return ca_cert, ca_key
 end
@@ -260,7 +273,10 @@ function issue_cert(attrs, func)
 
 	attrs.issued = issued
 	attrs.expires = expires
-	attrs.privateKey = key:toPEM('private')
+	attrs.privateKey = key:getPrivateKey(
+		config.db['encrypt-keys'] or nil,
+		function() return get_password(ca) end
+	)
 
 	cert:addExtension(
 		x509ext.new(
@@ -322,7 +338,7 @@ function export_cert(cert)
 	file:write(
 		tostring(
 			pkcs12.new{
-				key=pkey.new(cert.privateKey, 'PEM', 'private'),
+				key=decrypt_key(cert.privateKey),
 				certs=chain,
 				password=password
 			}
