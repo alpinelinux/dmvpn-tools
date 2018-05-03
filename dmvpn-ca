@@ -55,7 +55,7 @@ end
 set_config_defaults(
 	config,
 	{
-		['db-file']='/var/lib/misc/dmvpn-ca.sqlite3',
+		db={file='/var/lib/misc/dmvpn-ca.sqlite3'},
 		cert={
 			lifetime=365 * 24 * 60 * 60,
 			['hash-alg']='SHA256',
@@ -90,7 +90,7 @@ stat.umask(bit32.bor(stat.S_IRWXG, stat.S_IRWXO))
 function connection()
 	if not sql then
 		sql = require('luasql.sqlite3').sqlite3()
-		conn = sql:connect(config['db-file'])
+		conn = sql:connect(config.db.file)
 		conn:setautocommit(false)
 	end
 	return conn
@@ -930,7 +930,7 @@ output = scan_choice(
 				generate=function()
 					scan_finished()
 
-					os.remove(config['db-file'])
+					os.remove(config.db.file)
 					for _, statement in ipairs(
 						{
 							[[
