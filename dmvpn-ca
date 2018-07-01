@@ -210,9 +210,11 @@ function detect_prefix_afi(s)
 end
 
 
-function get_password(new)
-	if not password then password = dmvpn.get_password(new) end
-	return password
+passwords = {}
+function get_password(new, id)
+	if not id then id = 'default' end
+	if not passwords[id] then passwords[id] = dmvpn.get_password(new) end
+	return passwords[id]
 end
 
 function decrypt_key(key)
@@ -228,6 +230,13 @@ function load_ca()
 		ca_key = decrypt_key(row[2])
 	end
 	return ca_cert, ca_key
+end
+
+function encrypt_key(key, new_pw, pw_id)
+	return key:getPrivateKey(
+		config.db['encrypt-keys'] or nil,
+		function() return get_password(new_pw, pw_id) end
+	)
 end
 
 function sign(object, hash_alg, cert, key)
@@ -273,10 +282,7 @@ function issue_cert(attrs, func)
 
 	attrs.issued = issued
 	attrs.expires = expires
-	attrs.privateKey = key:getPrivateKey(
-		config.db['encrypt-keys'] or nil,
-		function() return get_password(ca) end
-	)
+	attrs.privateKey = encrypt_key(key, ca)
 
 	cert:addExtension(
 		x509ext.new(
@@ -1281,6 +1287,22 @@ output = scan_choice(
 				export=function()
 					scan_finished()
 					io.write(tostring(generate_crl()))
+				end
+			},
+			password={
+				set=function()
+					for row in select_many(
+						'serial, privateKey',
+						'certificate',
+						nil,
+						'n'
+					) do
+						update(
+							'certificate',
+							{privateKey=encrypt_key(decrypt_key(row[2]), true, 'new')},
+							{serial=row[1]}
+						)
+					end
 				end
 			}
 		},
