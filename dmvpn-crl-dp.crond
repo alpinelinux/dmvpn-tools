@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Cron job for CRL retrieval for distribution
+# Copyright (c) 2018 Kaarle Ritvanen
+# See LICENSE file for license details
+
+CONF_FILE=/etc/dmvpn-crl-dp.conf
+[ -e $CONF_FILE ] && . $CONF_FILE
+
+cd /var/www/localhost/htdocs
+${REMOTE_HOST:+ssh $REMOTE_HOST} dmvpn-ca crl export > "${CRL_PATH:-dmvpn-ca.crl}"
