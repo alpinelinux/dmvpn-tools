@@ -642,18 +642,18 @@ function generate_crl()
 	local crl = x509crl.new()
 	crl:setVersion(2)
 
-	local filter = {name='next-crl-number'}
-	local serial = select_one('value', 'counter', filter)
-	update('counter', {value=serial + 1}, filter)
+	local old_serial = select_one('serial', 'crl')
+	local new_serial = (old_serial or 0) + 1
 
 	crl:addExtension(
 		x509ext.new(
-			'crlNumber', 'DER', rfc5280.CRLNumber.encode(serial)
+			'crlNumber', 'DER', rfc5280.CRLNumber.encode(new_serial)
 		)
 	)
 
 	local timestamp = crl:getLastUpdate()
-	crl:setNextUpdate(timestamp + config.crl.lifetime)
+	local expires = timestamp + config.crl.lifetime
+	crl:setNextUpdate(expires)
 
 	for cert in select_certs() do
 		if cert.expires > timestamp and cert.revoked then
@@ -663,7 +663,15 @@ function generate_crl()
 
 	sign(crl, config.crl['hash-alg'])
 
+	insert('crl', {serial=new_serial, expires=expires, data=tostring(crl)})
+	if old_serial then delete('crl', {serial=old_serial}) end
+
 	return crl
+end
+
+function get_crl()
+	local row = select_one('expires, data', 'crl', nil, 'n')
+	return row and row[1] > now and x509crl.new(row[2]) or generate_crl()
 end
 
 
@@ -956,13 +964,6 @@ output = scan_choice(
 					for _, statement in ipairs(
 						{
 							[[
-								CREATE TABLE counter (
-									name VARCHAR(16) NOT NULL PRIMARY KEY,
-									value INTEGER NOT NULL DEFAULT 1
-								)
-							]],
-							"INSERT INTO counter (name) VALUES ('next-crl-number')",
-							[[
 								CREATE TABLE site (
 									code VARCHAR(16) NOT NULL PRIMARY KEY,
 									asn INTEGER NOT NULL,
@@ -1010,6 +1011,13 @@ output = scan_choice(
 									privateKey TEXT NOT NULL,
 									data TEXT NOT NULL,
 									FOREIGN KEY(site, vpnc) REFERENCES vpnc(site, id)
+								)
+							]],
+							[[
+								CREATE TABLE crl (
+									serial INTEGER NOT NULL PRIMARY KEY,
+									expires DATETIME NOT NULL,
+									data TEXT NOT NULL
 								)
 							]]
 						}
@@ -1280,13 +1288,17 @@ output = scan_choice(
 				end
 			},
 			crl={
+				generate=function()
+					scan_finished()
+					io.write(tostring(generate_crl()))
+				end,
 				show=function()
 					scan_finished()
-					io.write(generate_crl():text())
+					io.write(get_crl():text())
 				end,
 				export=function()
 					scan_finished()
-					io.write(tostring(generate_crl()))
+					io.write(tostring(get_crl()))
 				end
 			},
 			password={

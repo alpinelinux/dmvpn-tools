@@ -30,6 +30,6 @@ dmvpn-ca cert generate [hubs|hub <id>|site <abbr> [vpnc <id>]]
 dmvpn-ca cert {list|show|revoke} [serial <num>|hubs|hub <id>|site <abbr> [vpnc <id>]]
 dmvpn-ca cert export serial <num>
 
-dmvpn-ca crl {show|export}
+dmvpn-ca crl {generate|show|export}
 
 dmvpn-ca password set
