@@ -221,7 +221,7 @@ function decrypt_key(key)
 	return pkey.new(key, 'PEM', 'private', get_password)
 end
 
-function load_ca()
+function load_ca_cert()
 	if not ca_cert then
 		local row = select_one(
 			'data, privateKey', 'certificate', {serial=0}, 'n'
@@ -240,7 +240,7 @@ function encrypt_key(key, new_pw, pw_id)
 end
 
 function sign(object, hash_alg, cert, key)
-	if not cert then cert, key = load_ca() end
+	if not cert then cert, key = load_ca_cert() end
 	object:setIssuer(cert:getSubject())
 
 	object:addExtension(
@@ -345,9 +345,8 @@ function export_cert(cert)
 	end
 	password = string.char(table.unpack(password))
 
-	local ca_cert = load_ca()
 	local chain = x509ch.new()
-	chain:add(ca_cert)
+	chain:add(load_ca_cert())
 	chain:add(x509.new(cert.data, 'PEM'))
 
 	local file = io.open(
