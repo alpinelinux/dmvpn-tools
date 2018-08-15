@@ -7,6 +7,7 @@ See LICENSE file for license details
 
 dmvpn = require('dmvpn')
 pkcs12 = require('openssl.pkcs12')
+rfc5280 = require('asn1.rfc5280')
 
 name = arg[1]
 file = io.open(name)
@@ -22,17 +23,24 @@ if not success then
 	key, cert, chain = pkcs12.parse(data, dmvpn.get_password())
 end
 
-function write_pem_file(dir, data)
-	local file = io.open('/etc/swanctl/'..dir..'/dmvpn.pem', 'w')
+function write_pem_file(data, dir, suffix)
+	local file = io.open(
+		'/etc/swanctl/'..dir..'/dmvpn'..(suffix or '')..'.pem', 'w'
+	)
 	file:write(data)
 	file:close()
 end
 
-write_pem_file('private', key:toPEM('private'))
-write_pem_file('x509', tostring(cert))
-for i, ca_cert in pairs(chain) do
-	assert(i == 1)
-	write_pem_file('x509ca', tostring(ca_cert))
+write_pem_file(key:toPEM('private'), 'private')
+write_pem_file(tostring(cert), 'x509')
+for _, ca_cert in pairs(chain) do
+	local suffix
+	local usage = rfc5280.KeyUsage.decode(
+		ca_cert:getExtension('keyUsage'):getData()
+	)
+	if usage.keyCertSign then suffix = ''
+	elseif usage.cRLSign then suffix = '-crl' end
+	if suffix then write_pem_file(tostring(ca_cert), 'x509ca', suffix) end
 end
 
 function print_var(name, value)

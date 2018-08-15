@@ -262,8 +262,10 @@ function sign(object, hash_alg, cert, key)
 end
 
 function issue_cert(attrs, func)
-	local ca = attrs.serial == 0
 	local key = pkey.new(attrs.params.key)
+
+	local ca = attrs.usage and attrs.usage.keyCertSign
+	attrs.serial = ca and 0 or next_key('certificate', 'serial')
 
 	local cert = x509.new()
 	cert:setVersion(3)
@@ -278,7 +280,7 @@ function issue_cert(attrs, func)
 	end
 	cert:setSubject(dn)
 
-	cert:setBasicConstraints{CA=ca}
+	cert:setBasicConstraints{CA=attrs.usage}
 	cert:setBasicConstraintsCritical(true)
 
 	local issued = cert:getLifetime()
@@ -287,7 +289,8 @@ function issue_cert(attrs, func)
 
 	attrs.issued = issued
 	attrs.expires = expires
-	attrs.privateKey = encrypt_key(key, ca)
+	attrs.privateKey = (ca or not attrs.usage) and encrypt_key(key, ca) or
+		key:getPrivateKey()
 
 	cert:addExtension(
 		x509ext.new(
@@ -297,16 +300,15 @@ function issue_cert(attrs, func)
 		)
 	)
 
-	if ca then
+	if attrs.usage then
 		cert:addExtension(
 			x509ext.new(
 				'keyUsage',
 				'DER',
-				rfc5280.KeyUsage.encode{
-					['keyCertSign']=true, ['cRLSign']=true
-				}
+				rfc5280.KeyUsage.encode(attrs.usage)
 			)
 		)
+		attrs.usage = nil
 	end
 
 	local crl_dp = config.crl['dist-point']
@@ -339,6 +341,10 @@ function issue_cert(attrs, func)
 	return attrs
 end
 
+function issue_ca_cert(usage)
+	return issue_cert{dn=config.ca.dn, params=config.ca, usage=usage}
+end
+
 function export_cert(cert)
 	local password = {}
 	for i=1,config['password-length'] do
@@ -352,6 +358,9 @@ function export_cert(cert)
 
 	local chain = x509ch.new()
 	chain:add(load_ca_cert())
+
+	if config.db['encrypt-keys'] then chain:add(load_crl_cert()) end
+
 	chain:add(x509.new(cert.data, 'PEM'))
 
 	local file = io.open(
@@ -648,12 +657,43 @@ function get_certs()
 		end, get_cert_by_serial(serial)
 	end
 
+	if arg[1] == 'crl' then
+		return select_certs('site IS NULL AND serial > 0')
+	end
+
 	return select_certs(
 		vpnc_filter(scan_vpnc{multiple=true, retired=true}) or
 			'serial > 0'
 	)
 end
 
+
+function try_load_crl_cert()
+	if not config.db['encrypt-keys'] then
+		return table.unpack{load_ca_cert()}
+	end
+
+	if not crl_cert then
+		for row in select_certs(
+			'site IS NULL and serial > 0', 'serial DESC'
+		) do
+			if not crl_cert then
+				local cert, key = load_cert(row)
+				if is_valid(row) then
+					crl_cert = cert
+					crl_key = key
+				end
+			end
+		end
+	end
+	return crl_cert, crl_key
+end
+
+function load_crl_cert()
+	local cert, key = try_load_crl_cert()
+	if not cert then error('No valid CRL signing key found') end
+	return cert, key
+end
 
 function generate_crl()
 	local crl = x509crl.new()
@@ -678,7 +718,7 @@ function generate_crl()
 		end
 	end
 
-	sign(crl, config.crl['hash-alg'])
+	sign(crl, config.crl['hash-alg'], table.unpack{load_crl_cert()})
 
 	insert('crl', {serial=new_serial, expires=expires, data=tostring(crl)})
 	if old_serial then delete('crl', {serial=old_serial}) end
@@ -1047,10 +1087,9 @@ output = scan_choice(
 						add_subnet('', subnet)
 					end
 
-					issue_cert{
-						dn=config.ca.dn,
-						serial=0,
-						params=config.ca
+					issue_ca_cert{
+						keyCertSign=true,
+						cRLSign=not config.db['encrypt-keys']
 					}
 				end,
 				show=function()
@@ -1059,78 +1098,94 @@ output = scan_choice(
 			},
 			cert={
 				generate=function()
-					local vpnc = vpnc_filter(
+					local crl = arg[1] == 'crl'
+					local vpnc = not crl and vpnc_filter(
 						scan_vpnc{multiple=true},
 						's.code',
 						'v.id'
 					)
 
-					local filter = vpnc or {}
-					filter['s.active'] = '1'
-					filter['v.active'] = '1'
-
-					local subjects = {}
 					local dns = {}
-
-					for row in select_many(
-						's.code, v.id, s.asn, s.name, v.name',
-						'site s INNER JOIN vpnc v ON s.code = v.site',
-						filter,
-						'n'
-					) do
-						local attrs = {
-							site=row[1],
-							vpnc=row[2],
-							asn=row[3],
-							sname=row[4],
-							vname=row[5]
-						}
-
-						local function insert()
-							attrs.params = config[
-								attrs.site == '' and
-									'hub' or
-									'spoke'
-							]
-
-							attrs.dn = attrs.params.dn:gsub(
-								'%$(%u+)',
-								{
-									ROOT=config.ca.dn,
-									SITE=attrs.sname or
-										attrs.site,
-									NAME=attrs.vname or
-										attrs.params[
-											'default-name'
-										]:gsub(
-											'$ID',
-											attrs.vpnc
-										)
-								}
-							)
-
-							table.insert(
-								subjects, attrs
-							)
+					local gen_crl_cert
+					if not vpnc then
+						gen_crl_cert = not try_load_crl_cert()
+						if gen_crl_cert then
 							table.insert(
 								dns,
-								{tostring(attrs.dn)}
+								{config.ca.dn}
 							)
 						end
+					end
 
-						if vpnc then insert()
+					local subjects = {}
 
-						else
-							local valid
-							for cert in select_certs{
-								site=row[1], vpnc=row[2]
-							} do
-								if is_valid(cert) then
-									valid = true
-								end
+					if not crl then
+						local filter = vpnc or {}
+						filter['s.active'] = '1'
+						filter['v.active'] = '1'
+
+						for row in select_many(
+							's.code, v.id, s.asn, s.name, v.name',
+							'site s INNER JOIN vpnc v ON s.code = v.site',
+							filter,
+							'n'
+						) do
+							local attrs = {
+								site=row[1],
+								vpnc=row[2],
+								asn=row[3],
+								sname=row[4],
+								vname=row[5]
+							}
+
+							local function insert()
+								attrs.params = config[
+									attrs.site == '' and
+										'hub' or
+										'spoke'
+								]
+
+								attrs.dn = attrs.params.dn:gsub(
+									'%$(%u+)',
+									{
+										ROOT=config.ca.dn,
+										SITE=attrs.sname or
+											attrs.site,
+										NAME=attrs.vname or
+											attrs.params[
+												'default-name'
+											]:gsub(
+												'$ID',
+												attrs.vpnc
+											)
+									}
+								)
+
+								table.insert(
+									subjects,
+									attrs
+								)
+								table.insert(
+									dns,
+									{tostring(attrs.dn)}
+								)
 							end
-							if not valid then
-								insert()
+
+							if vpnc then insert()
+
+							else
+								local valid
+								for cert in select_certs{
+									site=row[1],
+									vpnc=row[2]
+								} do
+									if is_valid(cert) then
+										valid = true
+									end
+								end
+								if not valid then
+									insert()
+								end
 							end
 						end
 					end
@@ -1140,11 +1195,16 @@ output = scan_choice(
 
 					local issued = {}
 
-					for _, attrs in ipairs(subjects) do
-						attrs.serial = next_key(
-							'certificate', 'serial'
+					if gen_crl_cert then
+						table.insert(
+							issued,
+							issue_ca_cert{
+								cRLSign=true
+							}
 						)
+					end
 
+					for _, attrs in ipairs(subjects) do
 						local asn = attrs.asn
 						attrs.asn = nil
 
@@ -1298,8 +1358,8 @@ output = scan_choice(
 						'serial', 'selector'
 					)
 					local cert = get_cert_by_serial(serial)
-					if cert.serial == 0 then
-						error('Cannot export root certificate')
+					if not cert.site then
+						error('Cannot export CA certificate')
 					end
 					export_cert(cert)
 				end
