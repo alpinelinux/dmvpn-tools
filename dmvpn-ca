@@ -292,6 +292,18 @@ function issue_cert(attrs, func)
 		)
 	)
 
+	if ca then
+		cert:addExtension(
+			x509ext.new(
+				'keyUsage',
+				'DER',
+				rfc5280.KeyUsage.encode{
+					['keyCertSign']=true, ['cRLSign']=true
+				}
+			)
+		)
+	end
+
 	local crl_dp = config.crl['dist-point']
 	if crl_dp then
 		cert:addExtension(
