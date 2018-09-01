@@ -149,8 +149,11 @@ end
 
 function delete(tbl, filter) execute('DELETE FROM '..tbl..where(filter)) end
 
-function select_many(what, from, filter, mode)
-	local cur = execute('SELECT '..what..' FROM '..from..where(filter))
+function select_many(what, from, filter, mode, order)
+	local cur = execute(
+		'SELECT '..what..' FROM '..from..where(filter)..
+			(order and ' ORDER BY '..order or '')
+	)
 	return function()
 		local row = cur:fetch(mode and {}, mode)
 		if row == nil then cur:close() end
@@ -158,8 +161,8 @@ function select_many(what, from, filter, mode)
 	end
 end
 
-function select_certs(filter)
-	return select_many('*', 'certificate', filter, 'a')
+function select_certs(filter, order)
+	return select_many('*', 'certificate', filter, 'a', order)
 end
 
 function select_one(...)
