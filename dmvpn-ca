@@ -180,6 +180,10 @@ function next_key(tbl, key, filter)
 	return (select_one('MAX('..key..')', tbl, filter) or 0) + 1
 end
 
+function select_cert(serial)
+	return select_one('*', 'certificate', {serial=serial}, 'a')
+end
+
 
 function toint(s, min, max, desc)
 	local i = tonumber(s)
@@ -629,7 +633,7 @@ function get_cert_by_serial(serial)
 	scan_finished()
 
 	serial = toint(serial, 0, nil, 'serial number')
-	local cert = select_one('*', 'certificate', {serial=serial}, 'a')
+	local cert = select_cert(serial)
 
 	if not cert then error('Invalid serial number') end
 	return cert
