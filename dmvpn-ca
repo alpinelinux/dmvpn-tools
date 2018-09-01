@@ -58,6 +58,7 @@ set_config_defaults(
 		db={file='/var/lib/misc/dmvpn-ca.sqlite3'},
 		cert={
 			lifetime=365 * 24 * 60 * 60,
+			renewal=30 * 24 * 60 * 60,
 			['hash-alg']='SHA256',
 			key={type='EC', curve='secp384r1'}
 		},
@@ -414,7 +415,9 @@ function print_cert(cert)
 	print(x509.new(cert.data, 'PEM'):text{'ext_parse'})
 end
 
-function is_valid(cert) return not cert.revoked and now < cert.expires end
+function is_valid(cert, margin)
+	return not cert.revoked and now < cert.expires - (margin or 0)
+end
 
 function revoke(filter)
 	local revoked = {}
@@ -1138,13 +1141,13 @@ output = scan_choice(
 								vname=row[5]
 							}
 
-							local function insert()
-								attrs.params = config[
-									attrs.site == '' and
-										'hub' or
-										'spoke'
-								]
+							attrs.params = config[
+								attrs.site == '' and
+									'hub' or
+									'spoke'
+							]
 
+							local function insert()
 								attrs.dn = attrs.params.dn:gsub(
 									'%$(%u+)',
 									{
@@ -1179,7 +1182,10 @@ output = scan_choice(
 									site=row[1],
 									vpnc=row[2]
 								} do
-									if is_valid(cert) then
+									if is_valid(
+										cert,
+										attrs.params.renewal
+									) then
 										valid = true
 									end
 								end
