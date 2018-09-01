@@ -404,6 +404,7 @@ function revoke(filter)
 			table.insert(revoked, cert)
 		end
 	end
+	if #revoked > 0 then delete('crl') end
 	return revoked
 end
 
