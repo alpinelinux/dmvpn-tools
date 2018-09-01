@@ -225,14 +225,12 @@ function decrypt_key(key)
 	return pkey.new(key, 'PEM', 'private', get_password)
 end
 
+function load_cert(row)
+	return x509.new(row.data, 'PEM'), decrypt_key(row.privateKey)
+end
+
 function load_ca_cert()
-	if not ca_cert then
-		local row = select_one(
-			'data, privateKey', 'certificate', {serial=0}, 'n'
-		)
-		ca_cert = x509.new(row[1], 'PEM')
-		ca_key = decrypt_key(row[2])
-	end
+	if not ca_cert then ca_cert, ca_key = load_cert(select_cert(0)) end
 	return ca_cert, ca_key
 end
 
