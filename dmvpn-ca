@@ -731,7 +731,8 @@ end
 
 function get_crl()
 	local row = select_one('expires, data', 'crl', nil, 'n')
-	return row and row[1] > now and x509crl.new(row[2]) or generate_crl()
+	return row and now < row[1] - config.crl.renewal and x509crl.new(row[2])
+		or generate_crl()
 end
 
 
