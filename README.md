@@ -16,7 +16,7 @@ configuration is used:
   hosts:
   - hubs.example.com
   subnets:
-  - '10.0.0.0/16'
+  - '10.0.0.0/8'
   - '172.18.0.0/16'
   - 'fd00::/32'
 </pre>
