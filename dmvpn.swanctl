@@ -12,6 +12,7 @@ connections {
 		}
 		remote {
 			cacerts = dmvpn.pem
+			revocation = ifuri
 		}
 		children {
 			dmvpn {
