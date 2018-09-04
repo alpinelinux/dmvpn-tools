@@ -23,14 +23,7 @@
 	"filter": [
 		{
 			"in": "_fw",
-			"service": [
-				"dns",
-				"http",
-				"https",
-				"ldap",
-				"ldaps",
-				"ntp"
-			]
+			"service": [ "dns", "http", "https", "ldap", "ldaps" ]
 		},
 		{ "in": "dmvpn-ipsec", "out": "_fw", "service": "ipsec" },
 		{ "in": "_fw", "out": "dmvpn-ipsec", "service": "ipsec" },
