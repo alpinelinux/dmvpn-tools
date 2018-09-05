@@ -759,16 +759,24 @@ function print_table(tbl)
 	end
 end
 
-function confirm(object, action, tbl)
-	if not (unistd.isatty(0) and tbl[1]) then return end
-
-	io.write('The following '..object..' will be '..action..':\n\n')
-	print_table(tbl)
+function simple_confirm(func)
+	if not unistd.isatty(0) then return end
+	func()
 	io.write('\nContinue (y/n)? ')
 	io.stdout:flush()
 	local input = io.read()
 	if not input or input:lower() ~= 'y' then os.exit() end
 	io.write('\n')
+end
+
+function confirm(object, action, tbl)
+	if #tbl == 0 then return end
+	simple_confirm(
+		function()
+			io.write('The following '..object..' will be '..action..':\n\n')
+			print_table(tbl)
+		end
+	)
 end
 
 
@@ -1020,6 +1028,14 @@ output = scan_choice(
 			['root-cert']={
 				generate=function()
 					scan_finished()
+
+					if stat.stat(config.db.file) then
+						simple_confirm(
+							function()
+								io.write('Current configuration and all keys will be lost.\n')
+							end
+						)
+					end
 
 					os.remove(config.db.file)
 					for _, statement in ipairs(
