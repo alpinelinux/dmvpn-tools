@@ -51,8 +51,12 @@ get_local_dev() {
 }
 
 enable_service() {
-	rc-update add $1
-	rc-service $1 start
+	if rc-service $1 status > /dev/null; then
+		rc-service $1 restart
+	else
+		rc-update add $1
+		rc-service $1 start
+	fi
 }
 
 enable_firewall() {
