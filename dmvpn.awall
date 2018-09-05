@@ -1,0 +1,24 @@
+{
+	"description": "DMVPN router",
+	"zone": {
+		"dmvpn-ipsec": { "addr": "0.0.0.0/0" },
+		"dmvpn-gre": { "addr": "0.0.0.0/0", "ipsec": true },
+		"dmvpn-bgp": {
+			"iface": "$dmvpn_gre_iface", "addr": "0.0.0.0/0"
+		},
+		"dmvpn": { "iface": "$dmvpn_gre_iface", "route-back": true }
+	},
+	"filter": [
+		{
+			"in": "_fw",
+			"service": [ "dns", "http", "https", "ldap", "ldaps" ]
+		},
+		{ "in": "dmvpn-ipsec", "out": "_fw", "service": "ipsec" },
+		{ "in": "_fw", "out": "dmvpn-ipsec", "service": "ipsec" },
+		{ "in": "dmvpn-gre", "out": "_fw", "service": "gre" },
+		{ "in": "_fw", "out": "dmvpn-gre", "service": "gre" },
+		{ "in": "dmvpn-bgp", "out": "_fw", "service": "bgp" },
+		{ "in": "_fw", "out": "dmvpn-bgp", "service": "bgp" },
+		{ "in": "dmvpn", "out": "dmvpn" }
+	]
+}

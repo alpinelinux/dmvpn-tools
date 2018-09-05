@@ -245,35 +245,42 @@ enable_service nhrpd
 vtysh -c "$(get_quagga_config)"
 
 
-if [ "$NFLOG_GROUP" ]; then
+if [ -f /etc/iptables/awall-save -o "$NFLOG_GROUP" ]; then
 	apk add awall
-	cat > /etc/awall/dmvpn.json <<EOF
-{
-	"variable": {
-		"dmvpn_gre_iface": "$GRE_IFACE",
-		"dmvpn_nflog_group": $NFLOG_GROUP,
-		"dmvpn_site_mask": { "inet": $SITE_PREFIX_LEN_IPV4 }
-	}
-}
-EOF
-	[ "$SITE_PREFIX_LEN_IPV6" ] && augtool -s <<EOF
-set /files/etc/awall/dmvpn.json/dict/entry/dict/entry['dmvpn_site_mask']/dict/entry[2] inet6
-set /files/etc/awall/dmvpn.json/dict/entry/dict/entry['dmvpn_site_mask']/dict/entry[2]/number $SITE_PREFIX_LEN_IPV6
-EOF
+	echo "{ \"variable\": { \"dmvpn_gre_iface\": \"$GRE_IFACE\" } }" > \
+		/etc/awall/dmvpn-config.json
 
-	awall enable dmvpn-hub
-	awall translate
-	enable_firewall iptables
-
-	cat > /etc/nhrp-events.conf <<EOF
+	if [ "$NFLOG_GROUP" ]; then
+		cat > /etc/nhrp-events.conf <<EOF
 max-prefix-length:
   ip: $SITE_PREFIX_LEN_IPV4
 EOF
-
-	if [ "$SITE_PREFIX_LEN_IPV6" ]; then
-		enable_firewall ip6tables
-		cat >> /etc/nhrp-events.conf <<EOF
+		[ "$SITE_PREFIX_LEN_IPV6" ] && \
+			cat >> /etc/nhrp-events.conf <<EOF
   ipv6: $SITE_PREFIX_LEN_IPV6
 EOF
+
+		(
+			PREFIX="set /files/etc/awall/dmvpn-config.json/dict/entry/dict/entry"
+			cat <<EOF
+$PREFIX[2] dmvpn_nflog_group
+$PREFIX[2]/number $NFLOG_GROUP
+$PREFIX[3] dmvpn_site_mask
+$PREFIX[3]/dict/entry inet
+$PREFIX[3]/dict/entry/number $SITE_PREFIX_LEN_IPV4
+EOF
+			[ "$SITE_PREFIX_LEN_IPV6" ] && cat <<EOF
+$PREFIX[3]/dict/entry[2] inet6
+$PREFIX[3]/dict/entry[2]/number $SITE_PREFIX_LEN_IPV6
+EOF
+		) | augtool -s
+		awall enable dmvpn-hub
+	else
+		awall enable dmvpn
 	fi
+
+	awall translate
+	enable_firewall iptables
+	[ -f /etc/iptables/rules6-save -o "$SITE_PREFIX_LEN_IPV6" ] && \
+		enable_firewall ip6tables
 fi
