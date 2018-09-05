@@ -50,8 +50,12 @@ get_local_dev() {
 	ip route list table local | get_dev local $1
 }
 
+is_active() {
+	rc-service $1 status > /dev/null
+}
+
 enable_service() {
-	if rc-service $1 status > /dev/null; then
+	if is_active $1; then
 		rc-service $1 restart
 	else
 		rc-update add $1
@@ -132,6 +136,7 @@ EOF
 	[ "$GRE_IPV6_ADDRESS" ] && get_nhrp_config ipv6
 	cat <<EOF
 		exit
+		no router bgp $AS_NUMBER
 		router bgp $AS_NUMBER
 EOF
 	get_config_cmds network $IPV4_PREFIXES
@@ -224,6 +229,10 @@ augtool -s <<EOF
 set /files/etc/conf.d/nhrpd/rc_need '"charon nhrp-events"'
 set /files/etc/strongswan.d/charon.conf/charon/x509/enforce_critical no
 EOF
+
+for serv in charon zebra; do
+	is_active $serv && rc-service $serv stop
+done
 
 for serv in bgpd nhrpd zebra; do
 	file=/etc/quagga/$serv.conf
