@@ -536,7 +536,7 @@ function scan_vpnc(options)
 	end
 
 	if res.id and not exists('vpnc', res, not options.retired) then
-		error('Invalid '..obj..' number: '..vpnc)
+		error('Invalid '..obj..' number: '..res.id)
 	end
 
 	return res
