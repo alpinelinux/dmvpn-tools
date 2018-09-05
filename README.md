@@ -19,6 +19,11 @@ configuration is used:
   - '10.0.0.0/8'
   - '172.18.0.0/16'
   - 'fd00::/32'
+
+crl:
+  dist-point: 'http://crl.example.com/dmvpn-ca.crl'
+  lifetime: 1800
+  renewal: 1200
 </pre>
 
 The `hosts` attribute specifies the IPv4 addresses of the hubs or DNS name(s)
@@ -28,6 +33,9 @@ resolving to those. In this example, it is assumed that resolution of
 The `subnets` attribute is a list of subnets used in the VPN. This should
 include the address ranges of all sites and the GRE tunnel addresses. In this
 example, the following IP address scheme is used:
+
+The `crl` object should be left out unless the CRL distribution point will be
+configured.
 
 <table>
 <tr><td></td><th>IPv4</td><th>IPv6</th></tr>
@@ -91,6 +99,19 @@ The encrypted file contains the individual certificate, the corresponding
 private key, and the root certificate. The password is embedded in the file
 name. The file should be renamed when using out-of-band delivery for the
 password.
+
+## Setting Up CRL Distribution Point
+
+In this example, the CA host serves also as the CRL distribution point. It is
+assumed that `crl.example.com` resolves to the IP address of that host.
+
+Execute the following commands on the CA host to set up CRL distribution:
+
+<pre>apk add dmvpn-crl-dp
+dmvpn-crl-update
+rc-update add lighttpd
+rc-service lighttpd start
+</pre>
 
 ## Setting Up a Hub
 
