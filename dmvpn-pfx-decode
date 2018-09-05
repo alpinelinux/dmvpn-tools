@@ -15,7 +15,7 @@ data = file:read('*a')
 file:close()
 
 name = name:match('/([^/]+)$') or name
-password = name:match('^%w*_%d+%.(%w+)%.pfx$')
+password = name:match('^[-%w]*_%d+%.(%w+)%.pfx$')
 if password then
 	success, key, cert, chain = pcall(pkcs12.parse, data, password)
 end
