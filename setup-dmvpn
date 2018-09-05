@@ -39,6 +39,7 @@ if [ $VPNC_TYPE = hub ]; then
 fi
 
 
+GRE_MODULE=nf_conntrack_proto_gre
 PMTU_SYSCTL=net.ipv4.ip_forward_use_pmtu
 
 
@@ -280,6 +281,11 @@ EOF
 	fi
 
 	awall translate
+
+	if modprobe $GRE_MODULE; then
+		echo $GRE_MODULE > /etc/modules-load.d/dmvpn.conf
+	fi
+
 	enable_firewall iptables
 	[ -f /etc/iptables/rules6-save -o "$SITE_PREFIX_LEN_IPV6" ] && \
 		enable_firewall ip6tables
