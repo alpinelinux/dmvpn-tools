@@ -151,8 +151,8 @@ prompted. The password is deduced from the file name unless renamed.
 <pre>setup-dmvpn &lt;pfx file&gt;
 </pre>
 
-The spoke is now operational. Firewall rules are not set up automatically for
-the spokes.
+The spoke is now operational. Firewall rules are updated automatically if they
+are managed using `awall`.
 
 Due to an unresolved issue, you may have to reboot the host if VPN tunnels are
 not established within a reasonable time.
