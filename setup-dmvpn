@@ -139,6 +139,7 @@ EOF
 		exit
 		no router bgp $AS_NUMBER
 		router bgp $AS_NUMBER
+			bgp router-id $GRE_IPV4_ADDRESS
 EOF
 	get_config_cmds network $IPV4_PREFIXES
 	if [ "$IPV6_PREFIXES" ]; then
