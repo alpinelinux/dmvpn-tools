@@ -3,7 +3,7 @@
 --[[
 Certificate Authority tool for Dynamic Multipoint VPN
 
-Copyright (c) 2014-2018 Kaarle Ritvanen
+Copyright (c) 2014-2019 Kaarle Ritvanen
 Copyright (c) 2015 Timo Teräs
 Copyright (c) 2017 Natanael Copa
 
@@ -1113,6 +1113,7 @@ output = scan_choice(
 					}
 				end,
 				show=function()
+					scan_finished()
 					print_cert(get_cert_by_serial(0))
 				end
 			},
