@@ -775,7 +775,7 @@ function simple_confirm(func)
 end
 
 function confirm(object, action, tbl)
-	if #tbl == 0 then return end
+	if #tbl == 0 then user_error('No such '..object..' to be '..action) end
 	simple_confirm(
 		function()
 			io.write('The following '..object..' will be '..action..':\n\n')
@@ -1251,7 +1251,7 @@ commands = {
 					end
 				end
 
-				add_header(dns, {'dn'})
+				if #dns == 0 then return end
 				confirm('certificates', 'issued', dns)
 
 				local issued = {}
