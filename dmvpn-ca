@@ -463,11 +463,9 @@ function scan_subnet()
 	return addr
 end
 
-function scan_choice(choices, desc)
-	local token = scan_next(desc)
-	if not token then return end
-	for k, v in pairs(choices) do if token == k then return v end end
-	syntax_error('Invalid '..desc..': '..token)
+function scan_name_token()
+	local token = scan_next('attribute')
+	if token ~= 'name' then syntax_error('Invalid attribute: '..token) end
 end
 
 function scan_param(choices, desc, optional)
@@ -821,13 +819,11 @@ commands = {
 		unset={
 			'name <abbr>',
 			function()
-				local k = scan_choice(
-					{name='name'}, 'attribute'
-				)
+				scan_name_token()
 				local site = scan_site()
 				scan_finished()
 
-				update('site', {[k]=false}, {code=site})
+				update('site', {name=false}, {code=site})
 			end
 		},
 		show={
@@ -935,7 +931,7 @@ commands = {
 		unset={
 			'name site <abbr> id <num>',
 			function()
-				scan_choice({name=true}, 'attribute')
+				scan_name_token()
 				local vpnc = scan_vpnc{id_attr='id'}
 				scan_finished()
 
@@ -1030,7 +1026,7 @@ commands = {
 		unset={
 			'name <id>',
 			function()
-				scan_choice({name=true}, 'attribute')
+				scan_name_token()
 				local id = toid(scan_next('hub number'))
 				scan_finished()
 
