@@ -96,6 +96,9 @@ function connection()
 	if not sql then
 		sql = require('luasql.sqlite3').sqlite3()
 		conn = sql:connect(config.db.file)
+		if not conn then
+			error('Cannot open database file: '..config.db.file)
+		end
 		conn:setautocommit(false)
 	end
 	return conn
@@ -1510,12 +1513,12 @@ if syntax then
 	)
 	if status then
 		if output then print_table(output) end
-		if sql then conn:commit() end
+		if conn then conn:commit() end
 	else print(output) end
 end
 
 if sql then
-	conn:close()
+	if conn then conn:close() end
 	sql:close()
 end
 
