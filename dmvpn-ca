@@ -532,7 +532,7 @@ function scan_vpnc(options)
 		obj = 'hub'
 	else
 		local _, vpnc = scan_param(
-			options.id_attr or 'vpnc', 'VPNc number', true
+			options.id_attr or 'vpnc', 'selector', true
 		)
 		if not (vpnc or options.multiple) then vpnc = 1 end
 
