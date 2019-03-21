@@ -1,4 +1,4 @@
-# Copyright (c) 2017-2018 Kaarle Ritvanen
+# Copyright (c) 2017-2019 Kaarle Ritvanen
 # See LICENSE file for license details
 
 connections {
@@ -18,9 +18,10 @@ connections {
 			dmvpn {
 				local_ts = dynamic[gre]
 				remote_ts = dynamic[gre]
-				inactivity = 90m
 				rekey_time = 100m
 				mode = transport
+				inactivity = 90m
+				reqid = 1
 			}
 		}
 	}
