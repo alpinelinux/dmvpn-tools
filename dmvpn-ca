@@ -261,7 +261,11 @@ function sign(object, hash_alg, cert, key)
 			'authorityKeyIdentifier',
 			'DER',
 			rfc5280.AuthorityKeyIdentifier.encode{
-				keyIdentifier=cert:getPublicKeyDigest()
+				keyIdentifier=rfc5280.KeyIdentifier.decode(
+					cert:getExtension(
+						'subjectKeyIdentifier'
+					):getData()
+				)
 			}
 		)
 	)
