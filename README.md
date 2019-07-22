@@ -115,6 +115,15 @@ rc-service lighttpd start
 
 ## Setting Up a Hub
 
+*Warning*: This procedure will automatically set up the `iptables` firewall
+using `awall`. If you require any additional rules, such as allowing SSH access
+to the host, you should configure those first. The easiest way to do so is to
+use the `setup-firewall` utility:
+
+<pre>apk add awall-policies
+setup-firewall
+</pre>
+
 Install the `dmvpn` package on the host to be configured as a DMVPN hub. It is
 assumed that the network configuration of the host is already in place.
 
@@ -130,9 +139,9 @@ maximum length should be given.
 <pre>setup-dmvpn &lt;pfx file&gt;
 </pre>
 
-The hub is now operational. The tool sets up the `iptables` firewall
-automatically using `awall`. Firewall for IPv6 (`ip6tables`) is set up only if
-IPv6 addresses are defined for the VPN.
+The hub is now operational and its firewall has been set up. Firewall for IPv6
+(`ip6tables`) is set up by `setup-dmvpn` only if IPv6 addresses are defined for
+the VPN. (`setup-firewall` sets it up if IPv6 is enabled in the kernel.)
 
 Due to an unresolved issue, you may have to reboot the host if VPN tunnels are
 not established within a reasonable time.
