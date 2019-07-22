@@ -152,13 +152,22 @@ EOF
 		get_route_map_config ADD +
 		get_route_map_config SET
 		cat <<EOF
-		ip prefix-list no-hosts seq 5 permit 0.0.0.0/0 le 30
+		no ip prefix-list dmvpn
+		no ip prefix-list no-hosts
+EOF
+		for p in $IPV4_PREFIXES; do
+			echo "ip prefix-list dmvpn permit $p le 32"
+			echo "ip prefix-list no-hosts permit $p le 30"
+		done
+		cat <<EOF
 		router bgp $AS_NUMBER
 			redistribute nhrp
+			redistribute kernel
 EOF
 		get_peer_config hubs ADD \
 			"remote-as $AS_NUMBER" \
-			"timers connect 10"
+			"timers connect 10" \
+			"prefix-list dmvpn out"
 		get_spoke_config ebgp "attribute-unchanged med"
 		get_spoke_config ibgp \
 			"remote-as $AS_NUMBER" \
