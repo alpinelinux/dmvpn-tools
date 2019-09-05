@@ -100,14 +100,28 @@ private key, and the root certificate. The password is embedded in the file
 name. The file should be renamed when using out-of-band delivery for the
 password.
 
-## Setting Up CRL Distribution Point
+## Setting Up a CRL Distribution Point
 
-In this example, the CA host serves also as the CRL distribution point. It is
-assumed that `crl.example.com` resolves to the IP address of that host.
+In this example, the CA host serves also as the master CRL distribution point.
+In addition, there may be other distribution points which periodically mirror
+the CRL from the CA host. It is assumed that `ca.example.com` resolves to the
+CA host and `crl.example.com` resolves to the IP addreses of all distribution
+points.
 
-Execute the following commands on the CA host to set up CRL distribution:
+Install the CRL distribution point package on the target host (CA host or
+mirror):
 
 <pre>apk add dmvpn-crl-dp
+</pre>
+
+If setting up a mirror, configure the master distribution point by creating a
+file named `/etc/dmvpn-crl-dp.conf` with the following contents:
+<pre>MASTER_CRL_URL=http://ca.example.com/dmvpn-ca.crl
+</pre>
+
+Activate CRL distribution by executing the following commands:
+
+<pre>
 dmvpn-crl-update
 rc-update add lighttpd
 rc-service lighttpd start

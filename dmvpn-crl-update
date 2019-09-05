@@ -1,11 +1,25 @@
 #!/bin/sh
 
 # Cron job for CRL retrieval for distribution
-# Copyright (c) 2018 Kaarle Ritvanen
+# Copyright (c) 2018-2019 Kaarle Ritvanen
 # See LICENSE file for license details
 
 CONF_FILE=/etc/dmvpn-crl-dp.conf
 [ -e $CONF_FILE ] && . $CONF_FILE
 
+NEW_CRL=$(mktemp /tmp/dmvpn-crl.XXXXXX)
+
+if [ "$MASTER_CRL_URL" ]; then
+	wget -q -O $NEW_CRL "$MASTER_CRL_URL"
+else
+	${REMOTE_HOST:+ssh $REMOTE_HOST} dmvpn-ca crl export > $NEW_CRL
+fi
+
+if [ $? -gt 0 ]; then
+	rm $NEW_CRL
+	exit 1
+fi
+
+chmod 644 $NEW_CRL
 cd /var/www/localhost/htdocs
-${REMOTE_HOST:+ssh $REMOTE_HOST} dmvpn-ca crl export > "${CRL_PATH:-dmvpn-ca.crl}"
+mv $NEW_CRL "${CRL_PATH:-dmvpn-ca.crl}"
