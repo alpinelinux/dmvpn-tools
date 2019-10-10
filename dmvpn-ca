@@ -443,7 +443,7 @@ function revoke(filter)
 			table.insert(revoked, cert)
 		end
 	end
-	if #revoked > 0 then delete('crl') end
+	if #revoked > 0 then update('crl', {expires=now}) end
 	return revoked
 end
 
