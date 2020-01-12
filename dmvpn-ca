@@ -3,7 +3,7 @@
 --[[
 Certificate Authority tool for Dynamic Multipoint VPN
 
-Copyright (c) 2014-2019 Kaarle Ritvanen
+Copyright (c) 2014-2020 Kaarle Ritvanen
 Copyright (c) 2015 Timo Teräs
 Copyright (c) 2017 Natanael Copa
 
@@ -233,7 +233,9 @@ function get_password(new, id)
 end
 
 function decrypt_key(key)
-	return pkey.new(key, 'PEM', 'private', get_password)
+	return pkey.new(
+		key, {format='PEM', type='private', password=get_password}
+	)
 end
 
 function load_cert(row)
@@ -246,10 +248,11 @@ function load_ca_cert()
 end
 
 function encrypt_key(key, new_pw, pw_id)
-	return key:getPrivateKey(
-		config.db['encrypt-keys'] or nil,
-		function() return get_password(new_pw, pw_id) end
-	)
+	return key:toPEM{
+		type='private',
+		cipher=config.db['encrypt-keys'] or nil,
+		password=function() return get_password(new_pw, pw_id) end
+	}
 end
 
 function sign(object, hash_alg, cert, key)
@@ -302,7 +305,7 @@ function issue_cert(attrs, func)
 	attrs.issued = issued
 	attrs.expires = expires
 	attrs.privateKey = (ca or not attrs.usage) and encrypt_key(key, ca) or
-		key:getPrivateKey()
+		key:toPEM{type='private'}
 
 	cert:addExtension(
 		x509ext.new(
