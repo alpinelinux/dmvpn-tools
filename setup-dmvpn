@@ -1,7 +1,7 @@
 #!/bin/sh -e
 
 # Dynamic Multipoint VPN setup script for Alpine Linux
-# Copyright (c) 2017-2019 Kaarle Ritvanen
+# Copyright (c) 2017-2020 Kaarle Ritvanen
 # See LICENSE file for license details
 
 
@@ -237,10 +237,7 @@ EOF
 fi
 
 
-augtool -s <<EOF
-set /files/etc/conf.d/nhrpd/rc_need '"charon nhrp-events"'
-set /files/etc/strongswan.d/charon.conf/charon/x509/enforce_critical no
-EOF
+augtool -s "set /files/etc/conf.d/nhrpd/rc_need '\"charon nhrp-events\"'"
 
 for serv in charon zebra; do
 	is_active $serv && rc-service $serv stop
