@@ -2,6 +2,7 @@
 # See LICENSE file for license details
 
 charon {
+	make_before_break = yes
 	x509 {
 		enforce_critical = no
 	}
