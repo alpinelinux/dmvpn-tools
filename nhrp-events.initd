@@ -1,13 +1,22 @@
 #!/sbin/openrc-run
 
 # init.d file for nhrp-events
-# Copyright (c) 2017-2018 Kaarle Ritvanen
+# Copyright (c) 2017-2020 Kaarle Ritvanen
 
 name=nhrp-events
-command=/usr/sbin/$name
 pidfile=/var/run/$name.pid
-command_background=1
 
 depend() {
 	need bgpd
+}
+
+start() {
+	local rc
+	local socket=/var/run/$name.sock
+	ebegin "Starting $name"
+	rm -f $socket
+	start-stop-daemon -bmS -p $pidfile /usr/sbin/$name
+	rc=$?
+	ewaitfile 5 $socket
+	eend $rc
 }
