@@ -2,6 +2,7 @@
 # See LICENSE file for license details
 
 charon {
+	inactivity_close_ike = yes
 	make_before_break = yes
 	x509 {
 		enforce_critical = no
