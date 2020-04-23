@@ -2,7 +2,7 @@
 
 This guide explains how to set up a Dynamic Multipoint VPN using `setup-dmvpn`.
 
-## Certificate Authority
+## Setting Up the Certificate Authority
 
 Install the Certificate Authority (CA) tool on a secure host:
 
@@ -100,7 +100,7 @@ private key, and the root certificate. The password is embedded in the file
 name. The file should be renamed when using out-of-band delivery for the
 password.
 
-## Setting Up a CRL Distribution Point
+## <a name="crl"></a>Setting Up a CRL Distribution Point
 
 In this example, the CA host serves also as the master CRL distribution point.
 In addition, there may be other distribution points which periodically mirror
@@ -157,9 +157,6 @@ The hub is now operational and its firewall has been set up. Firewall for IPv6
 (`ip6tables`) is set up by `setup-dmvpn` only if IPv6 addresses are defined for
 the VPN. (`setup-firewall` sets it up if IPv6 is enabled in the kernel.)
 
-Due to an unresolved issue, you may have to reboot the host if VPN tunnels are
-not established within a reasonable time.
-
 ## Setting Up a Site VPNc (Spoke)
 
 Install the `dmvpn` package on the host to be configured as a DMVPN spoke. It
@@ -177,5 +174,55 @@ prompted. The password is deduced from the file name unless renamed.
 The spoke is now operational. Firewall rules are updated automatically if they
 are managed using `awall`.
 
-Due to an unresolved issue, you may have to reboot the host if VPN tunnels are
-not established within a reasonable time.
+## Backing Up the CA
+
+It may be a good idea to back up the configuration and the state of
+the CA. This section describes one way to do so.
+
+If you are using a firewall, allow outgoing SSH connections to the
+backup host. If you set it up with `setup-firewall`, you can do this by
+enabling the `adp-ssh-client` policy. This will allow SSH connections
+to any host, though.
+
+<pre>awall enable adp-ssh-client
+awall activate
+</pre>
+
+Generate an SSH key pair on the CA host:
+
+<pre>ssh-keygen
+</pre>
+
+Append the generated public key to the list of the authorized keys on
+the backup host. Install `rsync` on the backup host:
+
+<pre>apk add rsync
+</pre>
+
+Install `in-sync` on the CA host:
+
+<pre>apk add in-sync
+</pre>
+
+Configure the backup host as the target in the CA host's
+`/etc/in-sync.conf`:
+
+<pre>TARGET_HOSTS="backup.ca.example.com"
+</pre>
+
+Start the synchronization service on the CA host:
+
+<pre>rc-update add in-sync
+rc-service in-sync start
+</pre>
+
+### Disaster Recovery
+
+In case the original CA host is lost, you may convert the backup host
+to a new CA host by installing the CA tool:
+
+<pre>apk add dmvpn-ca
+</pre>
+
+If the CA host was serving as the master CRL distribution point, you
+need to [set up that function](#crl) as well.
